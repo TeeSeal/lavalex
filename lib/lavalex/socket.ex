@@ -1,7 +1,7 @@
 defmodule Lavalex.Socket do
   use WebSockex
 
-  def start_link(state) do
+  def start_link(node) do
     headers = [
       "Authorization": Application.get_env(:lavalex, :password),
       "Num-Shards": Application.get_env(:lavalex, :num_shards),
@@ -11,18 +11,18 @@ defmodule Lavalex.Socket do
     WebSockex.start_link(
       "ws://" <> Application.get_env(:lavalex, :host),
       __MODULE__,
-      state,
+      node,
       extra_headers: headers
     )
   end
 
-  def handle_frame({type, msg}, state) do
-    IO.puts "Received Message - Type: #{inspect type} -- Message: #{inspect msg}"
-    {:ok, state}
+  def handle_frame(frame, node) do
+    Lavalex.Node.message(node, frame)
+    {:ok, node}
   end
 
-  def handle_cast({:send, {type, msg} = frame}, state) do
+  def handle_cast({:send, {type, msg} = frame}, node) do
     IO.puts "Sending #{type} frame with payload: #{msg}"
-    {:reply, frame, state}
+    {:reply, frame, node}
   end
 end
