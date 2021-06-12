@@ -10,6 +10,9 @@ defmodule Lavalex.Message do
   end
 
   def serialize(map) do
-    Lavalex.Util.camelize(map)
+    map
+    |> Enum.reject(fn {_, v} -> is_nil(v) end)
+    |> Map.new()
+    |> Lavalex.Util.camelize()
   end
 end
