@@ -12,8 +12,8 @@ defmodule Lavalex.Node do
 
     state = %{
       websocket: websocket,
-      session_ids: :ets.new(:session_ids, []),
-      voice_servers: :ets.new(:voice_servers, [])
+      user_id: Application.get_env(:lavalex, :user_id),
+      players: %{}
     }
 
     {:ok, state}
@@ -27,12 +27,37 @@ defmodule Lavalex.Node do
     GenServer.cast(node, {:message, message})
   end
 
+  def get_player(node, guild_id) do
+    GenServer.call(node, {:get_player, guild_id})
+  end
+
+  def get_all_players(node) do
+    GenServer.call(node, :get_all_players)
+  end
+
+  def remove_player(node, guild_id) do
+    GenServer.cast(node, {:remove_player, guild_id})
+  end
+
   def voice_state_update(node, data) do
     GenServer.cast(node, {:voice_state_update, data})
   end
 
   def voice_server_update(node, data) do
     GenServer.cast(node, {:voice_server_update, data})
+  end
+
+  def handle_call({:get_player, guild_id}, _from, state) do
+    {player, state} = get_or_start_player(guild_id, state)
+    {:reply, player, state}
+  end
+
+  def handle_call(:get_all_players, _from, %{players: players} = state) do
+    {:reply, players, state}
+  end
+
+  def handle_cast({:remove_player, guild_id}, %{players: players} = state) do
+    {:noreply, %{state | players: Map.delete(players, guild_id)}}
   end
 
   def handle_cast({:send, data}, %{websocket: websocket} = state) do
@@ -46,49 +71,37 @@ defmodule Lavalex.Node do
     {:noreply, state}
   end
 
-  def handle_cast({:voice_server_update, data}, %{voice_servers: voice_servers} = state) do
-    :ets.insert(voice_servers, {data.guild_id, data})
-    send_voice_update(data.guild_id, state)
+  def handle_cast({:voice_server_update, %{guild_id: guild_id} = voice_server}, state) do
+    {player, state} = get_or_start_player(guild_id, state)
+    Lavalex.Player.set_voice_server(player, voice_server)
     {:noreply, state}
   end
 
-  def handle_cast(
-        {:voice_state_update, data},
-        %{session_ids: session_ids, voice_servers: voice_servers} = state
-      ) do
-    user_id = Application.get_env(:lavalex, :user_id)
-
-    case data do
-      %{user_id: ^user_id, channel_id: nil} ->
-        :ets.delete(session_ids, data.guild_id)
-        :ets.delete(voice_servers, data.guild_id)
-
-      %{user_id: ^user_id} ->
-        :ets.insert(session_ids, {data.guild_id, data.session_id})
-        send_voice_update(data.guild_id, state)
-
-      _ ->
-        nil
-    end
-
+  def handle_cast({:voice_state_update, %{user: %{id: user_id}}}, %{user_id: lavalex_user_id} = state)
+      when user_id != lavalex_user_id do
     {:noreply, state}
   end
 
-  defp send_voice_update(guild_id, %{voice_servers: voice_servers, session_ids: session_ids}) do
-    case {:ets.lookup(session_ids, guild_id), :ets.lookup(voice_servers, guild_id)} do
-      {[{_, session_id}], [{_, voice_server}]} ->
-        message =
-          %Lavalex.Message.VoiceUpdate{
-            guild_id: guild_id,
-            session_id: session_id,
-            event: voice_server
-          }
-          |> Lavalex.Message.serialize()
+  def handle_cast({:voice_state_update, %{guild_id: guild_id, channel_id: nil}}, %{players: players} = state) do
+    if {:ok, player} = Map.fetch(players, guild_id), do: Lavalex.Player.destroy(player)
+    {:noreply, state}
+  end
 
-        __MODULE__.send(self(), message)
+  def handle_cast({:voice_state_update, %{guild_id: guild_id, session_id: session_id}}, state) do
+    {player, state} = get_or_start_player(guild_id, state)
+    Lavalex.Player.set_session_id(player, session_id)
+    {:noreply, state}
+  end
 
-      _ ->
-        nil
+  defp get_or_start_player(guild_id, %{players: players} = state) do
+    case Map.fetch(players, guild_id) do
+      {:ok, player} ->
+        {player, state}
+
+      :error ->
+        {:ok, player} = Lavalex.Player.start_link(self(), guild_id)
+        players = Map.put(players, guild_id, player)
+        {player, %{state | players: players}}
     end
   end
 end
