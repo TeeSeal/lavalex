@@ -1,18 +1,29 @@
 defmodule Lavalex.Message do
-  def serialize(%{guild_id: guild_id} = map) when is_integer(guild_id) do
-    map
-    |> Map.put(:guild_id, Integer.to_string(guild_id))
-    |> serialize()
+  defmacro __using__(_opts) do
+    quote do
+      def serialize(data) do
+        Lavalex.Message.serialize(data)
+      end
+
+      def build(params) do
+        struct!(__MODULE__, params) |> serialize()
+      end
+
+      defoverridable(serialize: 1)
+    end
   end
 
   def serialize(struct) when is_struct(struct) do
     Map.from_struct(struct) |> serialize()
   end
 
-  def serialize(map) do
+  def serialize(%{guild_id: guild_id} = map) when is_integer(guild_id) do
     map
-    |> Enum.reject(fn {_, v} -> is_nil(v) end)
-    |> Map.new()
-    |> Lavalex.Util.camelize()
+    |> Map.put(:guild_id, Integer.to_string(guild_id))
+    |> serialize()
+  end
+
+  def serialize(data) do
+    data |> Lavalex.Util.compact() |> Lavalex.Util.camelize()
   end
 end

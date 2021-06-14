@@ -1,4 +1,6 @@
 defmodule Lavalex.Message.Play do
+  use Lavalex.Message
+
   @enforce_keys [:guild_id, :track]
   defstruct [
     :guild_id,
