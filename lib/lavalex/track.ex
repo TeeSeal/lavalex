@@ -13,7 +13,8 @@ defmodule Lavalex.Track do
     :uri
   ]
 
-  def parse(%{ "track" => track, "info" => info}), do: parse(track, info)
+  def parse(%{"track" => track, "info" => info}), do: parse(track, info)
+
   def parse(track, info) do
     %Track{
       track: track,

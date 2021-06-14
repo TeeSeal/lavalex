@@ -3,7 +3,7 @@ defmodule Lavalex.Socket do
 
   def start_link(node) do
     headers = [
-      "Authorization": Application.get_env(:lavalex, :password),
+      Authorization: Application.get_env(:lavalex, :password),
       "Num-Shards": Application.get_env(:lavalex, :num_shards),
       "User-Id": Application.get_env(:lavalex, :user_id)
     ]
@@ -22,7 +22,7 @@ defmodule Lavalex.Socket do
   end
 
   def handle_cast({:send, {type, msg} = frame}, node) do
-    IO.puts "Sending #{type} frame with payload: #{msg}"
+    IO.puts("Sending #{type} frame with payload: #{msg}")
     {:reply, frame, node}
   end
 end
