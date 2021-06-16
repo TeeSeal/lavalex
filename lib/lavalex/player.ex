@@ -13,7 +13,10 @@ defmodule Lavalex.Player do
       node: node,
       guild_id: guild_id,
       session_id: nil,
-      voice_server: nil
+      voice_server: nil,
+      connected: false,
+      track: nil,
+      position: 0
     }
 
     {:ok, state}
@@ -43,6 +46,14 @@ defmodule Lavalex.Player do
     GenServer.cast(player, :destroy)
   end
 
+  def update(player, data) do
+    GenServer.cast(player, {:update, data})
+  end
+
+  def get_state(player) do
+    GenServer.call(player, :get_state)
+  end
+
   @impl true
   def handle_cast({:set_session_id, session_id}, state) do
     state = %{state | session_id: session_id}
@@ -61,7 +72,7 @@ defmodule Lavalex.Player do
   def handle_cast({:play, track}, %{node: node, guild_id: guild_id} = state) do
     message = Message.Play.build(guild_id: guild_id, track: track)
     Node.send(node, message)
-    {:noreply, state}
+    {:noreply, %{state | track: track}}
   end
 
   @impl true
@@ -77,6 +88,16 @@ defmodule Lavalex.Player do
     Node.send(node, message)
     Node.remove_player(node, guild_id)
     {:stop, :normal, state}
+  end
+
+  @impl true
+  def handle_cast({:update, data}, state) do
+    {:noreply, Map.merge(state, Map.take(data, [:connected, :position]))}
+  end
+
+  @impl true
+  def handle_call(:get_state, _from, state) do
+    {:reply, state, state}
   end
 
   defp send_voice_update(%{session_id: session_id, voice_server: voice_server})

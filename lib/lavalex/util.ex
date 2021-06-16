@@ -29,6 +29,39 @@ defmodule Lavalex.Util do
 
   def compact(data), do: reject_nil_values(data)
 
+  def underscore_keys(nil), do: nil
+
+  def underscore_keys(map = %{}) do
+    for {key, value} <- map, into: %{} do
+      {
+        Macro.underscore(key) |> String.replace("-", "_"),
+        underscore_keys(value)
+      }
+    end
+  end
+
+  def underscore_keys([head | rest]) do
+    [underscore_keys(head) | underscore_keys(rest)]
+  end
+
+  def underscore_keys(not_a_map) do
+    not_a_map
+  end
+
+  def atomize_keys(nil), do: nil
+
+  def atomize_keys(map) when is_map(map) do
+    for {key, value} <- map, into: %{}, do: {String.to_atom(key), atomize_keys(value)}
+  end
+
+  def atomize_keys([head | rest]) do
+    [atomize_keys(head) | atomize_keys(rest)]
+  end
+
+  def atomize_keys(not_a_map) do
+    not_a_map
+  end
+
   defp reject_nil_values(enum) do
     Enum.reject(enum, fn {_, v} -> is_nil(v) end)
   end

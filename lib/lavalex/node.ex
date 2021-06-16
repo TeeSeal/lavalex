@@ -66,8 +66,29 @@ defmodule Lavalex.Node do
   end
 
   def handle_cast({:message, {_type, message}}, state) do
-    log = message |> Poison.decode!() |> Poison.encode!(pretty: true)
-    Logger.info("[Lavalink]: " <> log)
+    message =
+      Poison.decode!(message) |> Lavalex.Util.underscore_keys() |> Lavalex.Util.atomize_keys()
+
+    case message do
+      %{op: "stats"} = message ->
+        handle_stats(message, state)
+
+      %{op: "playerUpdate", guild_id: guild_id, state: data} = message ->
+        {guild_id, _} = Integer.parse(guild_id)
+
+        {player, state} = get_or_start_player(guild_id, state)
+        Lavalex.Player.update(player, data)
+
+        message = Map.put(message, :guild_id, guild_id)
+        handle_player_update(message, state)
+
+      %{op: "event"} = message ->
+        handle_event(message, state)
+
+      message ->
+        Logger.info("[Lavalink] Unknown Message:" <> inspect(message))
+    end
+
     {:noreply, state}
   end
 
@@ -77,12 +98,18 @@ defmodule Lavalex.Node do
     {:noreply, state}
   end
 
-  def handle_cast({:voice_state_update, %{user: %{id: user_id}}}, %{user_id: lavalex_user_id} = state)
+  def handle_cast(
+        {:voice_state_update, %{user: %{id: user_id}}},
+        %{user_id: lavalex_user_id} = state
+      )
       when user_id != lavalex_user_id do
     {:noreply, state}
   end
 
-  def handle_cast({:voice_state_update, %{guild_id: guild_id, channel_id: nil}}, %{players: players} = state) do
+  def handle_cast(
+        {:voice_state_update, %{guild_id: guild_id, channel_id: nil}},
+        %{players: players} = state
+      ) do
     if {:ok, player} = Map.fetch(players, guild_id), do: Lavalex.Player.destroy(player)
     {:noreply, state}
   end
@@ -91,6 +118,18 @@ defmodule Lavalex.Node do
     {player, state} = get_or_start_player(guild_id, state)
     Lavalex.Player.set_session_id(player, session_id)
     {:noreply, state}
+  end
+
+  def handle_player_update(_data, _state) do
+    :noop
+  end
+
+  def handle_stats(_data, _state) do
+    :noop
+  end
+
+  def handle_event(_data, _state) do
+    :noop
   end
 
   defp get_or_start_player(guild_id, %{players: players} = state) do
