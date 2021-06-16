@@ -83,10 +83,7 @@ defmodule Lavalex.Player do
   end
 
   @impl true
-  def handle_cast(:destroy, %{node: node, guild_id: guild_id} = state) do
-    message = Message.Destroy.build(guild_id: guild_id)
-    Node.send(node, message)
-    Node.remove_player(node, guild_id)
+  def handle_cast(:destroy, state) do
     {:stop, :normal, state}
   end
 
@@ -98,6 +95,13 @@ defmodule Lavalex.Player do
   @impl true
   def handle_call(:get_state, _from, state) do
     {:reply, state, state}
+  end
+
+  @impl true
+  def terminate(:normal, %{node: node, guild_id: guild_id}) do
+    message = Message.Destroy.build(guild_id: guild_id)
+    Node.send(node, message)
+    Node.remove_player(node, guild_id)
   end
 
   defp send_voice_update(%{session_id: session_id, voice_server: voice_server})
