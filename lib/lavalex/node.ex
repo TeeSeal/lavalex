@@ -3,14 +3,49 @@ defmodule Lavalex.Node do
 
   require Logger
 
-  def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, :ok, opts)
+  @type node_state :: %{
+          callback_module: module,
+          websocket: pid,
+          user_id: integer,
+          players: map
+        }
+
+  @callback handle_player_update(map, node_state) :: any
+  @callback handle_stats(map, node_state) :: any
+  @callback handle_event(map, node_state) :: any
+
+  defmacro __using__(_opts) do
+    quote do
+      @behaviour Lavalex.Node
+
+      @impl Lavalex.Node
+      def handle_player_update(_data, _state) do
+        :noop
+      end
+
+      @impl Lavalex.Node
+      def handle_stats(_data, _state) do
+        :noop
+      end
+
+      @impl Lavalex.Node
+      def handle_event(_data, _state) do
+        :noop
+      end
+
+      defoverridable(handle_player_update: 2, handle_stats: 2, handle_event: 2)
+    end
   end
 
-  def init(:ok) do
+  def start_link({callback_module, opts}) do
+    GenServer.start_link(__MODULE__, callback_module, opts)
+  end
+
+  def init(callback_module) do
     {:ok, websocket} = Lavalex.Socket.start_link(self())
 
     state = %{
+      callback_module: callback_module,
       websocket: websocket,
       user_id: Application.get_env(:lavalex, :user_id),
       players: %{}
@@ -65,13 +100,16 @@ defmodule Lavalex.Node do
     {:noreply, state}
   end
 
-  def handle_cast({:message, {_type, message}}, %{players: players} = state) do
+  def handle_cast(
+        {:message, {_type, message}},
+        %{players: players, callback_module: callback_module} = state
+      ) do
     message =
       Poison.decode!(message) |> Lavalex.Util.underscore_keys() |> Lavalex.Util.atomize_keys()
 
     case message do
       %{op: "stats"} = message ->
-        handle_stats(message, state)
+        apply(callback_module, :handle_stats, [message, state])
 
       %{op: "playerUpdate", guild_id: guild_id, state: data} = message ->
         {guild_id, _} = Integer.parse(guild_id)
@@ -82,13 +120,13 @@ defmodule Lavalex.Node do
         end
 
         message = Map.put(message, :guild_id, guild_id)
-        handle_player_update(message, state)
+        apply(callback_module, :handle_player_update, [message, state])
 
       %{op: "event"} = message ->
-        handle_event(message, state)
+        apply(callback_module, :handle_event, [message, state])
 
       message ->
-        Logger.info("[Lavalink] Unknown Message:" <> inspect(message))
+        Logger.info("[Lavalex] Unknown Message: " <> inspect(message))
     end
 
     {:noreply, state}
@@ -124,18 +162,6 @@ defmodule Lavalex.Node do
     {player, state} = get_or_start_player(guild_id, state)
     Lavalex.Player.set_session_id(player, session_id)
     {:noreply, state}
-  end
-
-  def handle_player_update(_data, _state) do
-    :noop
-  end
-
-  def handle_stats(_data, _state) do
-    :noop
-  end
-
-  def handle_event(_data, _state) do
-    :noop
   end
 
   defp get_or_start_player(guild_id, %{players: players} = state) do
