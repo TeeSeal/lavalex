@@ -1,10 +1,10 @@
 defmodule Lavalex.Player do
-  use GenServer
+  use GenServer, restart: :transient
 
   alias Lavalex.{Message, Node, Track}
 
-  def start_link(node, guild_id, opts \\ []) do
-    GenServer.start_link(__MODULE__, %{node: node, guild_id: guild_id}, opts)
+  def start_link(node: node, guild_id: guild_id) do
+    GenServer.start_link(__MODULE__, %{node: node, guild_id: guild_id}, [])
   end
 
   @impl true

@@ -65,7 +65,7 @@ defmodule Lavalex.Node do
     {:noreply, state}
   end
 
-  def handle_cast({:message, {_type, message}}, state) do
+  def handle_cast({:message, {_type, message}}, %{players: players} = state) do
     message =
       Poison.decode!(message) |> Lavalex.Util.underscore_keys() |> Lavalex.Util.atomize_keys()
 
@@ -76,8 +76,10 @@ defmodule Lavalex.Node do
       %{op: "playerUpdate", guild_id: guild_id, state: data} = message ->
         {guild_id, _} = Integer.parse(guild_id)
 
-        {player, state} = get_or_start_player(guild_id, state)
-        Lavalex.Player.update(player, data)
+        case Map.fetch(players, guild_id) do
+          {:ok, player} -> Lavalex.Player.update(player, data)
+          :error -> :noop
+        end
 
         message = Map.put(message, :guild_id, guild_id)
         handle_player_update(message, state)
@@ -110,7 +112,11 @@ defmodule Lavalex.Node do
         {:voice_state_update, %{guild_id: guild_id, channel_id: nil}},
         %{players: players} = state
       ) do
-    if {:ok, player} = Map.fetch(players, guild_id), do: Lavalex.Player.destroy(player)
+    case Map.fetch(players, guild_id) do
+      {:ok, player} -> Lavalex.Player.destroy(player)
+      :error -> :noop
+    end
+
     {:noreply, state}
   end
 
@@ -138,9 +144,19 @@ defmodule Lavalex.Node do
         {player, state}
 
       :error ->
-        {:ok, player} = Lavalex.Player.start_link(self(), guild_id)
+        player = start_player(guild_id)
         players = Map.put(players, guild_id, player)
         {player, %{state | players: players}}
     end
+  end
+
+  defp start_player(guild_id) do
+    {:ok, player} =
+      DynamicSupervisor.start_child(
+        Lavalex.PlayerSupervisor,
+        {Lavalex.Player, node: self(), guild_id: guild_id}
+      )
+
+    player
   end
 end

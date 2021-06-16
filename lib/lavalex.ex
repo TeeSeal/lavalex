@@ -1,18 +1,21 @@
 defmodule Lavalex do
-  @moduledoc """
-  Documentation for `Lavalex`.
-  """
+  use Supervisor
 
-  @doc """
-  Hello world.
+  def start_link(node_opts) when is_list(node_opts) do
+    Supervisor.start_link(__MODULE__, {Lavalex.Node, node_opts}, name: LavalexSupervisor)
+  end
 
-  ## Examples
+  def start_link(node_child_spec) do
+    Supervisor.start_link(__MODULE__, node_child_spec, name: LavalexSupervisor)
+  end
 
-      iex> Lavalex.hello()
-      :world
+  @impl true
+  def init(node_child_spec) do
+    children = [
+      node_child_spec,
+      {DynamicSupervisor, strategy: :one_for_one, name: Lavalex.PlayerSupervisor}
+    ]
 
-  """
-  def hello do
-    :world
+    Supervisor.init(children, strategy: :one_for_one)
   end
 end
