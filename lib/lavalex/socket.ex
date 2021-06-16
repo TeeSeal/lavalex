@@ -12,7 +12,8 @@ defmodule Lavalex.Socket do
       "ws://" <> Application.get_env(:lavalex, :host),
       __MODULE__,
       node,
-      extra_headers: headers
+      extra_headers: headers,
+      name: __MODULE__
     )
   end
 
