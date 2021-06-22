@@ -12,7 +12,7 @@ defmodule Lavalex.Node do
 
   @callback handle_player_update(map, node_state) :: any
   @callback handle_stats(map, node_state) :: any
-  @callback handle_event(map, node_state) :: any
+  @callback handle_event(atom, map, node_state) :: any
 
   defmacro __using__(_opts) do
     quote do
@@ -29,11 +29,11 @@ defmodule Lavalex.Node do
       end
 
       @impl Lavalex.Node
-      def handle_event(_data, _state) do
+      def handle_event(_event, _data, _state) do
         :noop
       end
 
-      defoverridable(handle_player_update: 2, handle_stats: 2, handle_event: 2)
+      defoverridable(handle_player_update: 2, handle_stats: 2, handle_event: 3)
     end
   end
 
@@ -104,8 +104,7 @@ defmodule Lavalex.Node do
         {:message, {_type, message}},
         %{players: players, callback_module: callback_module} = state
       ) do
-    message =
-      Poison.decode!(message) |> Lavalex.Util.underscore_keys() |> Lavalex.Util.atomize_keys()
+    message = transform_message(message)
 
     case message do
       %{op: "stats"} = message ->
@@ -123,7 +122,8 @@ defmodule Lavalex.Node do
         apply(callback_module, :handle_player_update, [message, state])
 
       %{op: "event"} = message ->
-        apply(callback_module, :handle_event, [message, state])
+        event = message.type |> Macro.underscore() |> String.to_atom()
+        apply(callback_module, :handle_event, [event, message, state])
 
       message ->
         Logger.info("[Lavalex] Unknown Message: " <> inspect(message))
@@ -184,5 +184,19 @@ defmodule Lavalex.Node do
       )
 
     player
+  end
+
+  defp transform_message(message) do
+    message =
+      Poison.decode!(message) |> Lavalex.Util.underscore_keys() |> Lavalex.Util.atomize_keys()
+
+    case message do
+      %{guild_id: guild_id} = message ->
+        {guild_id, _} = Integer.parse(guild_id)
+        %{message | guild_id: guild_id}
+
+      message ->
+        message
+    end
   end
 end

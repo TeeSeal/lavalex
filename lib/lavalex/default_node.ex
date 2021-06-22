@@ -14,7 +14,7 @@ defmodule Lavalex.DefaultNode do
   end
 
   @impl Lavalex.Node
-  def handle_event(data, _state) do
+  def handle_event(_event, data, _state) do
     Logger.info("[Lavalex] Event: " <> inspect(data))
   end
 end
