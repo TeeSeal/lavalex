@@ -111,8 +111,6 @@ defmodule Lavalex.Node do
         apply(callback_module, :handle_stats, [message, state])
 
       %{op: "playerUpdate", guild_id: guild_id, state: data} = message ->
-        {guild_id, _} = Integer.parse(guild_id)
-
         case Map.fetch(players, guild_id) do
           {:ok, player} -> Lavalex.Player.update(player, data)
           :error -> :noop
