@@ -3,11 +3,23 @@ defmodule Lavalex.Player do
 
   alias Lavalex.{Message, Node, Track}
 
+  @type state :: %{
+    node: pid,
+    guild_id: integer,
+    session_id: String.t | nil,
+    voice_server: String.t | nil,
+    connected: boolean,
+    track: Track.t | nil,
+    position: integer
+  }
+
+  @spec start_link([{:guild_id, integer} | {:node, pid}]) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(node: node, guild_id: guild_id) do
     GenServer.start_link(__MODULE__, %{node: node, guild_id: guild_id}, [])
   end
 
   @impl true
+  @spec init(%{guild_id: integer, node: pid}) :: {:ok, state}
   def init(%{node: node, guild_id: guild_id}) do
     state = %{
       node: node,
@@ -22,14 +34,17 @@ defmodule Lavalex.Player do
     {:ok, state}
   end
 
+  @spec set_session_id(atom | pid | {atom, any} | {:via, atom, any}, String.t) :: :ok
   def set_session_id(player, session_id) do
     GenServer.cast(player, {:set_session_id, session_id})
   end
 
+  @spec set_voice_server(atom | pid | {atom, any} | {:via, atom, any}, map) :: :ok
   def set_voice_server(player, voice_server) do
     GenServer.cast(player, {:set_voice_server, voice_server})
   end
 
+  @spec play(atom | pid | {atom, any} | {:via, atom, any}, Track.t | String.t) :: :ok
   def play(player, %Track{track: track}) do
     GenServer.cast(player, {:play, track})
   end
@@ -38,18 +53,22 @@ defmodule Lavalex.Player do
     GenServer.cast(player, {:play, track})
   end
 
+  @spec stop(atom | pid | {atom, any} | {:via, atom, any}) :: :ok
   def stop(player) do
     GenServer.cast(player, :stop)
   end
 
+  @spec destroy(atom | pid | {atom, any} | {:via, atom, any}) :: :ok
   def destroy(player) do
     GenServer.cast(player, :destroy)
   end
 
+  @spec update(atom | pid | {atom, any} | {:via, atom, any}, map) :: :ok
   def update(player, data) do
     GenServer.cast(player, {:update, data})
   end
 
+  @spec get_state(atom | pid | {atom, any} | {:via, atom, any}) :: state
   def get_state(player) do
     GenServer.call(player, :get_state)
   end

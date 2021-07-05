@@ -13,6 +13,7 @@ defmodule Lavalex.Message do
     end
   end
 
+  @spec serialize(map | struct) :: map
   def serialize(struct) when is_struct(struct) do
     Map.from_struct(struct) |> serialize()
   end

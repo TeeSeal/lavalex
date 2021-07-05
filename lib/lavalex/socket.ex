@@ -1,6 +1,7 @@
 defmodule Lavalex.Socket do
   use WebSockex
 
+  @spec start_link(pid) :: {:error, any} | {:ok, pid}
   def start_link(node) do
     headers = [
       Authorization: Application.get_env(:lavalex, :password),

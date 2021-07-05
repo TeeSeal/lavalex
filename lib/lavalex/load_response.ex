@@ -1,6 +1,16 @@
 defmodule Lavalex.LoadResponse do
   defstruct [:type, :playlist_info, :tracks, :exception]
 
+  @type playlist_info :: %{name: String.t(), selected_track: integer} | %{}
+  @type exception :: %{message: String.t(), severity: String.t()}
+  @type t :: %__MODULE__{
+          type: String.t(),
+          playlist_info: playlist_info,
+          tracks: [Lavalex.Track.t()],
+          exception: exception | nil
+        }
+
+  @spec parse(map) :: Lavalex.LoadResponse.t()
   def parse(map) do
     %Lavalex.LoadResponse{
       type: map["loadType"],

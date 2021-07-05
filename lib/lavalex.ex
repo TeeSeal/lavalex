@@ -1,6 +1,7 @@
 defmodule Lavalex do
   use Supervisor
 
+  @spec start_link(list | {module, list}) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(node_opts) when is_list(node_opts) do
     Supervisor.start_link(__MODULE__, {Lavalex.DefaultNode, node_opts}, name: LavalexSupervisor)
   end

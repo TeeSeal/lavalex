@@ -3,16 +3,16 @@ defmodule Lavalex.Node do
 
   require Logger
 
-  @type node_state :: %{
+  @type state :: %{
           callback_module: module,
           websocket: pid,
           user_id: integer,
           players: map
         }
 
-  @callback handle_player_update(map, node_state) :: any
-  @callback handle_stats(map, node_state) :: any
-  @callback handle_event(atom, map, node_state) :: any
+  @callback handle_player_update(map, state) :: any
+  @callback handle_stats(map, state) :: any
+  @callback handle_event(atom, map, state) :: any
 
   defmacro __using__(_opts) do
     quote do
@@ -37,10 +37,12 @@ defmodule Lavalex.Node do
     end
   end
 
+  @spec start_link({module, list}) :: :ignore | {:error, any} | {:ok, pid}
   def start_link({callback_module, opts}) do
     GenServer.start_link(__MODULE__, callback_module, opts)
   end
 
+  @spec init(module) :: {:ok, state}
   def init(callback_module) do
     {:ok, websocket} = Lavalex.Socket.start_link(self())
 
@@ -54,30 +56,37 @@ defmodule Lavalex.Node do
     {:ok, state}
   end
 
+  @spec send(atom | pid | {atom, any} | {:via, atom, any}, any) :: :ok
   def send(node, data) do
     GenServer.cast(node, {:send, data})
   end
 
+  @spec message(atom | pid | {atom, any} | {:via, atom, any}, any) :: :ok
   def message(node, message) do
     GenServer.cast(node, {:message, message})
   end
 
+  @spec get_player(atom | pid | {atom, any} | {:via, atom, any}, integer) :: pid
   def get_player(node, guild_id) do
     GenServer.call(node, {:get_player, guild_id})
   end
 
+  @spec get_all_players(atom | pid | {atom, any} | {:via, atom, any}) :: %{integer => pid}
   def get_all_players(node) do
     GenServer.call(node, :get_all_players)
   end
 
+  @spec remove_player(atom | pid | {atom, any} | {:via, atom, any}, integer) :: :ok
   def remove_player(node, guild_id) do
     GenServer.cast(node, {:remove_player, guild_id})
   end
 
+  @spec voice_state_update(atom | pid | {atom, any} | {:via, atom, any}, map) :: :ok
   def voice_state_update(node, data) do
     GenServer.cast(node, {:voice_state_update, data})
   end
 
+  @spec voice_server_update(atom | pid | {atom, any} | {:via, atom, any}, map) :: :ok
   def voice_server_update(node, data) do
     GenServer.cast(node, {:voice_server_update, data})
   end
